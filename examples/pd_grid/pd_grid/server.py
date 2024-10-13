@@ -1,14 +1,14 @@
 import mesa
-
 from .model import PdGrid
 from .portrayal import portrayPDAgent
 
-# Make a world that is 50x50, on a 500x500 display.
-canvas_element = mesa.visualization.CanvasGrid(portrayPDAgent, 50, 50, 500, 500)
+# Створення елемента Canvas для відображення агента
+canvas_element = mesa.visualization.CanvasGrid(portrayPDAgent, 250, 250, 500, 500)
 
+# Параметри моделі
 model_params = {
-    "height": 50,
-    "width": 50,
+    "width": 250,  # Ширина моделі
+    "height": 250,  # Висота моделі
     "activation_order": mesa.visualization.Choice(
         "Activation regime",
         value="Random",
@@ -16,6 +16,10 @@ model_params = {
     ),
 }
 
+# Ініціалізація сервера
 server = mesa.visualization.ModularServer(
-    PdGrid, [canvas_element], "Prisoner's Dilemma", model_params
+    PdGrid,
+    [canvas_element],
+    "Prisoner's Dilemma",
+    model_params,
 )
