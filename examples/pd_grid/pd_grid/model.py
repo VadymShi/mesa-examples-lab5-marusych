@@ -1,45 +1,34 @@
 import mesa
-
+from mesa import Model, DataCollector
+from mesa.time import RandomActivation
+from mesa.space import SingleGrid
 from .agent import PDAgent
 
-
-class PdGrid(mesa.Model):
+class PdGrid(Model):
     """Model class for iterated, spatial prisoner's dilemma model."""
 
     activation_regimes = ["Sequential", "Random", "Simultaneous"]
-
-    # This dictionary holds the payoff for this agent,
-    # keyed on: (my_move, other_move)
-
     payoff = {("C", "C"): 1, ("C", "D"): 0, ("D", "C"): 1.6, ("D", "D"): 0}
 
-    def __init__(
-        self, width=50, height=50, activation_order="Random", payoffs=None, seed=None
-    ):
-        """
-        Create a new Spatial Prisoners' Dilemma Model.
+    def __init__(self, width=50, height=50, activation_order="Random", seed=None):
+        super().__init__(seed)
 
-        Args:
-            width, height: Grid size. There will be one agent per grid cell.
-            activation_order: Can be "Sequential", "Random", or "Simultaneous".
-                           Determines the agent activation regime.
-            payoffs: (optional) Dictionary of (move, neighbor_move) payoffs.
-        """
-        super().__init__()
+        if activation_order not in self.activation_regimes:
+            raise ValueError(f"Invalid activation order: {activation_order}")
+
         self.activation_order = activation_order
-        self.grid = mesa.space.SingleGrid(width, height, torus=True)
+        self.grid = SingleGrid(width, height, torus=True)
+        self.schedule = RandomActivation(self)  # Додаємо план
 
-        # Create agents
-        for x in range(width):
-            for y in range(height):
-                agent = PDAgent(self)
-                self.grid.place_agent(agent, (x, y))
+        # Create agents with unique IDs
+        for unique_id, (x, y) in enumerate((x, y) for x in range(width) for y in range(height)):
+            agent = PDAgent(self, unique_id)  # Передача унікального ID
+            self.grid.place_agent(agent, (x, y))
+            self.schedule.add(agent)  # Додаємо агента до плану
 
-        self.datacollector = mesa.DataCollector(
+        self.datacollector = DataCollector(
             {
-                "Cooperating_Agents": lambda m: len(
-                    [a for a in m.agents if a.move == "C"]
-                )
+                "Cooperating_Agents": lambda m: len([a for a in m.schedule.agents if a.isCooperating])
             }
         )
 
@@ -47,19 +36,18 @@ class PdGrid(mesa.Model):
         self.datacollector.collect(self)
 
     def step(self):
-        # Activate all agents, based on the activation regime
         match self.activation_order:
             case "Sequential":
-                self.agents.do("step")
+                self.schedule.step()
             case "Random":
-                self.agents.shuffle_do("step")
+                self.schedule.step()
             case "Simultaneous":
-                self.agents.do("step")
-                self.agents.do("advance")
+                self.schedule.step()
+                for agent in self.schedule.agents:
+                    agent.advance()
             case _:
                 raise ValueError(f"Unknown activation order: {self.activation_order}")
 
-        # Collect data
         self.datacollector.collect(self)
 
     def run(self, n):
